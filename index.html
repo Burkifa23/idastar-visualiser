@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDA* Algorithm Visualizer - Ghana Routes</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono&display=swap');
+
+        :root {
+            --bg-color: #f8fafc;
+            --panel-bg: rgba(255, 255, 255, 0.82);
+            --panel-border: rgba(15, 23, 42, 0.08);
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --accent-blue: #74ade8;
+            --accent-red: #ef4444;
+            --accent-green: #10b981;
+            --accent-gold: #b45309;
+            --font-stack: "Outfit", "Helvetica Neue", Helvetica, Arial, sans-serif;
+            --font-mono: "Space Mono", monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-stack);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #sidebar {
+            width: 350px;
+            background-color: var(--panel-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid var(--panel-border);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .header-panel {
+            padding: 0 0 15px 0;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        h1 { 
+            font-size: 1.25rem; 
+            font-weight: 700;
+            text-transform: uppercase; 
+            letter-spacing: 0.12em; 
+            color: #1e1b4b;
+            margin-bottom: 5px;
+        }
+        
+        p.subtitle { 
+            font-size: 0.8rem; 
+            color: var(--text-muted); 
+            line-height: 1.4; 
+        }
+
+        /* Threshold Bound Display */
+        #bound-display {
+            background-color: rgba(116, 173, 232, 0.08);
+            border: 1px solid rgba(116, 173, 232, 0.3);
+            padding: 12px;
+            margin-top: 15px;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+            color: #356ea8; /* Accessible color contrast */
+            font-weight: bold;
+            letter-spacing: 1px;
+            border-radius: 8px;
+        }
+
+        .settings-panel {
+            padding: 15px 0;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .control-row-grid {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+        }
+        .control-row-grid .setting-row {
+            flex: 1;
+        }
+
+        .setting-row { display: flex; flex-direction: column; gap: 5px; }
+        
+        label { 
+            font-size: 0.72rem; 
+            font-weight: 600;
+            text-transform: uppercase; 
+            letter-spacing: 0.08em; 
+            color: var(--text-muted); 
+        }
+
+        select, button {
+            background-color: #ffffff;
+            color: var(--text-main);
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            padding: 10px 14px;
+            font-family: var(--font-stack);
+            font-size: 0.88rem;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            outline: none;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(15,23,42,0.5)' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 14px;
+            padding-right: 36px;
+        }
+
+        select:focus, button:hover { 
+            border-color: rgba(116, 173, 232, 0.5); 
+            background-color: #f8fafc;
+            box-shadow: 0 0 0 3px rgba(116, 173, 232, 0.15);
+        }
+
+        .controls {
+            padding: 15px 0;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            background-color: #ffffff;
+            border: 1px solid rgba(15, 23, 42, 0.12);
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            font-size: 0.8rem;
+        }
+
+        button:hover {
+            background-color: rgba(116, 173, 232, 0.05);
+            border-color: var(--accent-blue);
+        }
+        button:active {
+            transform: scale(0.97);
+        }
+
+        #btn-play {
+            background-color: rgba(116, 173, 232, 0.08);
+            border-color: rgba(116, 173, 232, 0.18);
+            color: #356ea8;
+        }
+        #btn-play:hover {
+            background-color: var(--accent-blue);
+            color: #ffffff;
+            border-color: var(--accent-blue);
+        }
+
+        #log-container {
+            flex-grow: 1;
+            padding: 15px 0;
+            overflow-y: auto;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            line-height: 1.5;
+            color: #334155;
+        }
+
+        .log-entry { margin-bottom: 12px; line-height: 1.4; border-bottom: 1px solid rgba(15, 23, 42, 0.06); padding-bottom: 10px;}
+        
+        .log-reset { 
+            color: #356ea8; 
+            font-weight: bold; 
+            font-size: 0.82rem; 
+            text-align: center; 
+            border: 1px dashed rgba(116, 173, 232, 0.3); 
+            background-color: rgba(116, 173, 232, 0.03);
+            border-radius: 6px;
+            padding: 6px; 
+            margin-top: 10px;
+        }
+        
+        .log-cutoff { color: var(--accent-red); font-weight: 600; }
+        
+        .log-success { 
+            color: var(--accent-green); 
+            border: 1px solid var(--accent-green); 
+            padding: 12px; 
+            background: rgba(16, 185, 129, 0.06); 
+            border-radius: 8px;
+        }
+        
+        .data-highlight { color: #0f172a; font-weight: bold; }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            background-color: var(--bg-color);
+        }
+
+        canvas { display: block; width: 100%; height: 100%; }
+
+        #legend {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background-color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+            padding: 16px;
+            font-size: 0.75rem;
+            border-radius: 10px;
+            box-shadow: 0 8px 30px rgba(15, 23, 42, 0.08);
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .color-box { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(15, 23, 42, 0.08); }
+
+        @media (max-width: 850px) {
+            body {
+                flex-direction: column-reverse;
+                overflow: hidden;
+                height: 100vh;
+            }
+
+            #sidebar {
+                width: 100%;
+                height: 52vh;
+                max-height: 52vh;
+                border-right: none;
+                border-top: 1px solid var(--panel-border);
+                padding: 16px;
+                gap: 12px;
+            }
+
+            .header-panel {
+                padding: 5px 0;
+            }
+
+            #bound-display {
+                margin-top: 8px;
+                padding: 8px;
+                font-size: 1rem;
+            }
+
+            .settings-panel {
+                padding: 5px 0;
+            }
+
+            .controls {
+                padding: 5px 0;
+            }
+
+            #canvas-container {
+                width: 100%;
+                height: 48vh;
+                flex-grow: unset;
+            }
+
+            #legend {
+                top: 12px;
+                right: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="header-panel">
+            <h1>IDA* Visualizer</h1>
+            <p class="subtitle">Iterative-Deepening A* prunes paths using a dynamic cost limit threshold (f-bound = g + h) to ensure memory remains linear.</p>
+            <div id="bound-display">CURRENT F-BOUND : --</div>
+        </div>
+
+        <div class="settings-panel">
+            <div class="control-row-grid">
+                <div class="setting-row">
+                    <label>Start City</label>
+                    <select id="start-city"></select>
+                </div>
+                <div class="setting-row">
+                    <label>Destination City</label>
+                    <select id="end-city"></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button id="btn-step">Step</button>
+            <button id="btn-play">Play</button>
+            <button id="btn-reset">Reset</button>
+        </div>
+
+        <div id="log-container"></div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="mapCanvas"></canvas>
+        <div id="legend">
+            <div class="legend-item"><div class="color-box" style="background: #cbd5e1"></div> Unvisited</div>
+            <div class="legend-item"><div class="color-box" style="background: var(--accent-blue)"></div> Active Path</div>
+            <div class="legend-item"><div class="color-box" style="background: var(--accent-red)"></div> Cost Limit Exceeded</div>
+            <div class="legend-item"><div class="color-box" style="background: var(--accent-green)"></div> Final Optimal Route</div>
+        </div>
+    </div>
+
+<script>
+    // Network Topology Definitions
+    const graph = {
+        "Wa": { "Bolgatanga": 280, "Tamale": 290, "Sunyani": 320 },
+        "Bolgatanga": { "Wa": 280, "Tamale": 160 },
+        "Tamale": { "Wa": 290, "Bolgatanga": 160, "Yendi": 110, "Kintampo": 220, "Techiman": 360 },
+        "Yendi": { "Tamale": 110, "Ho": 500 },
+        "Kintampo": { "Tamale": 220, "Techiman": 110, "Kumasi": 280 },
+        "Techiman": { "Tamale": 360, "Kintampo": 110, "Sunyani": 120, "Kumasi": 130 },
+        "Sunyani": { "Wa": 320, "Techiman": 120, "Kumasi": 120 },
+        "Kumasi": { "Kintampo": 280, "Techiman": 130, "Sunyani": 120, "Koforidua": 190, "Accra": 250, "Cape Coast": 220 },
+        "Koforidua": { "Kumasi": 190, "Accra": 90 },
+        "Ho": { "Yendi": 500, "Accra": 160 },
+        "Accra": { "Kumasi": 250, "Koforidua": 90, "Ho": 160, "Cape Coast": 150, "Korle Bu": 15 },
+        "Cape Coast": { "Kumasi": 220, "Accra": 150 },
+        "Korle Bu": { "Accra": 15 }
+    };
+
+    const tableHeuristics = {
+        "Tamale": 600, "Kintampo": 400, "Techiman": 320, "Sunyani": 280,
+        "Kumasi": 220, "Koforidua": 80, "Accra": 10, "Korle Bu": 0,
+        "Cape Coast": 180, "Takoradi": 220, "Ho": 160, "Wa": 450,
+        "Bolgatanga": 650, "Yendi": 500
+    };
+
+    const coordinates = {
+        "Wa": { x: 200, y: 150 }, "Bolgatanga": { x: 450, y: 80 }, "Tamale": { x: 450, y: 250 },
+        "Yendi": { x: 650, y: 250 }, "Kintampo": { x: 450, y: 400 }, "Techiman": { x: 350, y: 480 },
+        "Sunyani": { x: 200, y: 520 }, "Kumasi": { x: 400, y: 650 }, "Koforidua": { x: 600, y: 700 },
+        "Ho": { x: 750, y: 600 }, "Accra": { x: 650, y: 800 }, "Cape Coast": { x: 350, y: 850 },
+        "Korle Bu": { x: 630, y: 830 }
+    };
+
+    function getProjectedCoords(cityName, cvWidth, cvHeight) {
+        const raw = coordinates[cityName];
+        const paddingX = cvWidth < 850 ? 30 : 60;
+        const paddingY = cvHeight < 850 ? 30 : 60;
+
+        const minX = 200, maxX = 750;
+        const minY = 80, maxY = 850;
+
+        const pctX = (raw.x - minX) / (maxX - minX);
+        const pctY = (raw.y - minY) / (maxY - minY);
+
+        return {
+            x: paddingX + pctX * (cvWidth - paddingX * 2),
+            y: paddingY + pctY * (cvHeight - paddingY * 2)
+        };
+    }
+
+    const canvas = document.getElementById('mapCanvas');
+    const ctx = canvas.getContext('2d');
+    const logContainer = document.getElementById('log-container');
+    const startSelect = document.getElementById('start-city');
+    const endSelect = document.getElementById('end-city');
+    const boundDisplay = document.getElementById('bound-display');
+
+    // UI Engine State
+    let isPlaying = false;
+    let playInterval = null;
+    let idastarGenerator = null;
+
+    // Graphic Rendering Collections
+    let activePath = [];
+    let cutoffNode = null;
+    let finalPath = [];
+
+    function initSelects() {
+        startSelect.innerHTML = '';
+        endSelect.innerHTML = '';
+        Object.keys(graph).forEach(city => {
+            startSelect.innerHTML += `<option value="${city}" ${city === 'Tamale' ? 'selected' : ''}>${city}</option>`;
+            endSelect.innerHTML += `<option value="${city}" ${city === 'Korle Bu' ? 'selected' : ''}>${city}</option>`;
+        });
+    }
+
+    function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth;
+        canvas.height = canvas.parentElement.clientHeight;
+        drawGraph();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function log(htmlContent) {
+        const div = document.createElement('div');
+        div.className = 'log-entry';
+        div.innerHTML = htmlContent;
+        logContainer.appendChild(div);
+        logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    // Dynamic Heuristic Function Mapping
+    function getHeuristic(node, goal) {
+        if (goal === "Korle Bu" && tableHeuristics[node] !== undefined) {
+            return tableHeuristics[node];
+        }
+        const n1 = coordinates[node], n2 = coordinates[goal];
+        return Math.sqrt(Math.pow(n1.x - n2.x, 2) + Math.pow(n1.y - n2.y, 2)) * 1.5;
+    }
+
+    // --- IDA* Engine Iteration Generator ---
+    function* runIDAStar(start, goal) {
+        let bound = getHeuristic(start, goal);
+        let stepCount = 1;
+
+        while (true) {
+            yield { type: 'new_bound', bound: bound, step: stepCount++ };
+
+            // Run a depth-bounded DFS. Memory space is isolated strictly to this array stack.
+            let stack = [{ node: start, path: [start], g: 0, f: bound }];
+            let minExceeded = Infinity;
+
+            while (stack.length > 0) {
+                let current = stack.pop();
+                let h = getHeuristic(current.node, goal);
+                let f = current.g + h;
+
+                // Pruning Check against current A* f-limit boundary
+                if (f > bound) {
+                    if (f < minExceeded) minExceeded = f;
+                    yield { type: 'cutoff', node: current.node, path: current.path, f: f, bound: bound, step: stepCount++ };
+                    continue;
+                }
+
+                if (current.node === goal) {
+                    finalPath = current.path;
+                    yield { type: 'success', path: finalPath, cost: current.g, step: stepCount++ };
+                    return;
+                }
+
+                // Node Extraction
+                let successors = Object.keys(graph[current.node]);
+                let generatedChildren = [];
+
+                // Reversing successors to allow clean matching pop order layout visually
+                for (let i = successors.length - 1; i >= 0; i--) {
+                    let neighbor = successors[i];
+                    if (!current.path.includes(neighbor)) {
+                        let nextG = current.g + graph[current.node][neighbor];
+                        let nextH = getHeuristic(neighbor, goal);
+                        stack.push({
+                            node: neighbor,
+                            path: [...current.path, neighbor],
+                            g: nextG,
+                            f: nextG + nextH
+                        });
+                        generatedChildren.push(neighbor);
+                    }
+                }
+
+                yield { type: 'expand', node: current.node, path: current.path, f: f, children: generatedChildren, step: stepCount++ };
+            }
+
+            // Target not reachable within any finite extension bounding box
+            if (minExceeded === Infinity) {
+                yield { type: 'fail', step: stepCount++ };
+                return;
+            }
+
+            // Increment bounding box factor threshold to lowest pruned cost
+            bound = minExceeded;
+        }
+    }
+
+    function processStep() {
+        if (!idastarGenerator) {
+            const startNode = startSelect.value;
+            const endNode = endSelect.value;
+
+            logContainer.innerHTML = '';
+            activePath = [];
+            finalPath = [];
+            cutoffNode = null;
+            log(`<span style="color:#356ea8; font-weight:bold;">INITIALIZING IDA*:</span> ${startNode} to ${endNode}`);
+            idastarGenerator = runIDAStar(startNode, endNode);
+        }
+
+        let result = idastarGenerator.next();
+        if (result.done) {
+            isPlaying = false;
+            document.getElementById('btn-play').innerText = 'Play';
+            clearInterval(playInterval);
+            return;
+        }
+
+        let state = result.value;
+
+        if (state.type === 'new_bound') {
+            activePath = [];
+            cutoffNode = null;
+            boundDisplay.innerText = `CURRENT F-BOUND : ${Math.round(state.bound)}`;
+            log(`<div class="log-reset">====== SHIFTING BOUNDARY TO F: ${Math.round(state.bound)} ======</div>`);
+        }
+        else if (state.type === 'expand') {
+            activePath = state.path;
+            cutoffNode = null;
+            log(`
+                <div style="color:var(--text-main); font-weight:bold;">Step ${state.step}: Checked ${state.node}</div>
+                <div style="color:#64748b; margin-top: 4px; font-size: 0.8rem;">Current f(n) evaluation: <span class="data-highlight">${Math.round(state.f)}</span></div>
+            `);
+        }
+        else if (state.type === 'cutoff') {
+            activePath = state.path;
+            cutoffNode = state.node;
+            log(`
+                <div class="log-cutoff">⊘ PRUNED: f-bound exceeded at ${state.node}</div>
+                <div style="color:#64748b; font-size: 0.8rem; margin-top: 4px;">
+                    Node f(${Math.round(state.f)}) > Current Bound (${Math.round(state.bound)}). Unwinding branch...
+                </div>
+            `);
+        }
+        else if (state.type === 'success') {
+            activePath = [];
+            finalPath = state.path;
+            log(`
+                <div class="log-success">
+                    <b>OPTIMAL ROUTE CAPTURED!</b><br>
+                    Path: ${state.path.join(' → ')}<br>
+                    Total Cost: ${state.cost} km
+                </div>
+            `);
+        }
+        else if (state.type === 'fail') {
+            log(`<div class="log-cutoff"><b>SEARCH COMPLETELY EXHAUSTED.</b><br>No route connection found.</div>`);
+        }
+
+        drawGraph();
+    }
+
+    function togglePlay() {
+        if (isPlaying) {
+            isPlaying = false;
+            document.getElementById('btn-play').innerText = 'Play';
+            clearInterval(playInterval);
+        } else {
+            isPlaying = true;
+            document.getElementById('btn-play').innerText = 'Pause';
+            playInterval = setInterval(processStep, 400); // Decoupled time interval loop ticks
+        }
+    }
+
+    function resetVisualizer() {
+        if(playInterval) clearInterval(playInterval);
+        isPlaying = false;
+        document.getElementById('btn-play').innerText = 'Play';
+        idastarGenerator = null;
+        activePath = [];
+        cutoffNode = null;
+        finalPath = [];
+        boundDisplay.innerText = `CURRENT F-BOUND : --`;
+        logContainer.innerHTML = '';
+        drawGraph();
+    }
+
+    function drawGraph() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let w = canvas.width, h = canvas.height;
+
+        let activePathEdges = new Set();
+        for (let i = 0; i < activePath.length - 1; i++) {
+            activePathEdges.add([activePath[i], activePath[i+1]].sort().join('-'));
+        }
+
+        let finalPathEdges = new Set();
+        for (let i = 0; i < finalPath.length - 1; i++) {
+            finalPathEdges.add([finalPath[i], finalPath[i+1]].sort().join('-'));
+        }
+
+        // Draw Line Vertices
+        let drawnEdges = new Set();
+        for (let city in graph) {
+            for (let neighbor in graph[city]) {
+                let edgeId = [city, neighbor].sort().join('-');
+                if (!drawnEdges.has(edgeId)) {
+                    drawnEdges.add(edgeId);
+                    let p1 = getProjectedCoords(city, w, h);
+                    let p2 = getProjectedCoords(neighbor, w, h);
+
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+
+                    if (finalPathEdges.has(edgeId)) {
+                        ctx.strokeStyle = '#10b981'; // Emerald
+                        ctx.lineWidth = w < 500 ? 3 : 5;
+                    } else if (activePathEdges.has(edgeId)) {
+                        ctx.strokeStyle = '#74ade8'; // Custom Light Blue
+                        ctx.lineWidth = w < 500 ? 2.5 : 3.5;
+                    } else {
+                        ctx.strokeStyle = '#e2e8f0'; // Slate-200
+                        ctx.lineWidth = 2.5;
+                    }
+                    ctx.stroke();
+
+                    // Weights (Fade out slightly so structure is more prominent)
+                    ctx.fillStyle = '#64748b'; // Slate-500
+                    ctx.font = w < 500 ? '9px monospace' : '10px monospace';
+                    ctx.fillText(graph[city][neighbor], (p1.x + p2.x)/2 + 5, (p1.y + p2.y)/2 - 5);
+                }
+            }
+        }
+
+        // Draw Circular Nodes
+        let activeNodes = new Set(activePath);
+        for (let city in coordinates) {
+            let p = getProjectedCoords(city, w, h);
+            let radius = w < 500 ? 6 : 8;
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
+
+            if (finalPath.includes(city)) {
+                ctx.fillStyle = '#10b981'; // Final Route (Emerald)
+            } else if (city === cutoffNode) {
+                ctx.fillStyle = '#ef4444'; // Red threshold alert (Crimson)
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ef4444';
+            } else if (activeNodes.has(city)) {
+                ctx.fillStyle = '#74ade8'; // Active Path (Custom Light Blue)
+                if (city === activePath[activePath.length-1]) {
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = '#74ade8';
+                }
+            } else {
+                ctx.fillStyle = '#cbd5e1'; // Unvisited (Slate-300)
+            }
+
+            ctx.fill();
+            ctx.shadowBlur = 0; // Clear transformation matrix shadows
+
+            // White border ring around node
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = '#0f172a'; // Slate-900
+            ctx.font = w < 500 ? '10px sans-serif' : '12px "Outfit", sans-serif';
+            ctx.fillText(city, p.x + (w < 500 ? 9 : 12), p.y + 4);
+        }
+    }
+
+    // Core Binder Hooks
+    document.getElementById('btn-step').addEventListener('click', processStep);
+    document.getElementById('btn-play').addEventListener('click', togglePlay);
+    document.getElementById('btn-reset').addEventListener('click', resetVisualizer);
+    startSelect.addEventListener('change', resetVisualizer);
+    endSelect.addEventListener('change', resetVisualizer);
+
+    // Initial render
+    initSelects();
+    resizeCanvas();
+</script>
+</body>
+</html>
